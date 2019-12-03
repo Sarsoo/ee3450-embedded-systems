@@ -1,0 +1,188 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+ 
+#include "TM4C123GH6PM.h"
+#include "ez123G.h"
+#include "MyDefines.h"
+ 
+char str[100];
+char ReadKeyPad2();
+char ReadKeyPad1();
+char ReadKeyPad();
+ 
+int main(void)
+{
+    PEZOBJ_LCD  lcd;
+    uint16_t    i = 0;
+ 
+    // GPIO Initialization and Configuration
+    // 1. Enable Clock on GPIOs
+    SYSCTL->RCGCGPIO |= 0x1B;
+    // allow time for clock to stabilize
+    while ((SYSCTL->PRGPIO & 0x1B) != 0x1B) {};
+    // 2. Unlock PD7 and/or PF0 for TM4C 123G
+    // 3. Config AMSEL to disable analog function
+    // 4. Config PCTL to select 0-GPIO
+    // 5. Set AFSEL bits to 0			
+    // 6. Set DIR to 0 for input, 1 for output
+			
+		GPIOA -> DIR = 0x00;
+		GPIOB -> DIR = 0x03;
+		GPIOD -> DIR = 0x0F;
+		GPIOE -> DIR = 0x3E;
+ 
+    // 7. Set PUR/PDR/ODR bits to 1 to enable internal pull-up/-down resistir and/or open-drain
+		GPIOB -> ODR = 0x03;
+		GPIOE -> ODR = 0x30;
+		GPIOA -> PUR = 0xE0;
+		GPIOB -> PUR = 0x10;
+			
+    // 8. Set DEN bits to 1 to enable all 
+		GPIOA -> DEN = 0xE0;
+		GPIOB -> DEN = 0x13;
+		GPIOD -> DEN = 0x0F;
+		GPIOE -> DEN = 0x3E;
+ 
+ 
+    lcd = ezLCD_Create();
+    ezLCD_Connect_DataPort(lcd, GPIOD, PIN_3_0);
+    ezLCD_Connect_ENPin(lcd, GPIOE, PIN1);
+    ezLCD_Connect_RSPin(lcd, GPIOE, PIN2);
+    ezLCD_Connect_RWPin(lcd, GPIOE, PIN3);
+ 
+    ezLCD_Start(lcd);
+    ezLCD_ClearDisplay(lcd);
+		
+		char ch;
+    while(1){
+        ch = ReadKeyPad();
+ 
+        if (ch == '*'){
+            i *= 100;
+            ezLCD_ClearDisplay(lcd);
+        }
+        if (ch == '#') i = 0;
+        if (ch >='0' && ch <= '9') i = i*10 + ch - '0';
+ 
+        sprintf(str, "%c   ", ch);
+        ezLCD_Position(lcd, 0, 0);
+        ezLCD_PrintString(lcd, str);
+ 
+        timer_waitMillis(100);
+    }
+}
+//--------------------------------------------------------------
+char KeyPad[4][4]={
+    {'1','2','3','A'},
+    {'4','5','6','B'},
+    {'7','8','9','C'},
+    {'*','0','#','D'}};
+
+char ReadKeyPad1()
+{
+
+			GPIOB -> DATA |= 0x03;
+			GPIOE -> DATA |= 0x30;
+					//GPIOB -> DATA |= 0x01;
+			GPIOB -> DATA &= ~0x02;
+					//GPIOE -> DATA |= 0x10;
+					//GPIOE -> DATA &= ~0x20;
+			
+			timer_waitMillis(10);
+			
+			if(!(GPIOB -> DATA & 0x10)) return KeyPad[1][0];
+			if(!(GPIOA -> DATA & 0x20)) return KeyPad[1][1];
+			if(!(GPIOA -> DATA & 0x40)) return KeyPad[1][2];
+			if(!(GPIOA -> DATA & 0x80)) return KeyPad[1][3];
+
+    return 0x0;
+}
+
+char ReadKeyPad2()
+{
+		int row;
+		GPIOB -> DATA |= 0x03;
+		GPIOE -> DATA |= 0x30;
+		for(row = 0; row < 4; row++){
+			switch(row){
+				case 0:
+					GPIOB -> DATA &= ~0x01;
+					timer_waitMillis(10);
+					if(!(GPIOB -> DATA & 0x10)) return KeyPad[0][0];
+					if(!(GPIOA -> DATA & 0x20)) return KeyPad[0][1];
+					if(!(GPIOA -> DATA & 0x40)) return KeyPad[0][2];
+					if(!(GPIOA -> DATA & 0x80)) return KeyPad[0][3];
+					break;
+				case 1:
+					GPIOB -> DATA |= 0x01;
+					GPIOB -> DATA &= ~0x02;
+					timer_waitMillis(10);
+					if(!(GPIOB -> DATA & 0x10)) return KeyPad[1][0];
+					if(!(GPIOA -> DATA & 0x20)) return KeyPad[1][1];
+					if(!(GPIOA -> DATA & 0x40)) return KeyPad[1][2];
+					if(!(GPIOA -> DATA & 0x80)) return KeyPad[1][3];
+					break;
+				case 2:
+					GPIOB -> DATA |= 0x02;
+					GPIOE -> DATA &= ~0x10;
+					timer_waitMillis(10);
+					if(!(GPIOB -> DATA & 0x10)) return KeyPad[2][0];
+					if(!(GPIOA -> DATA & 0x20)) return KeyPad[2][1];
+					if(!(GPIOA -> DATA & 0x40)) return KeyPad[2][2];
+					if(!(GPIOA -> DATA & 0x80)) return KeyPad[2][3];
+					break;
+				case 3:
+					GPIOE -> DATA |= 0x10;
+					GPIOE -> DATA &= ~0x20;
+					timer_waitMillis(10);
+					if(!(GPIOB -> DATA & 0x10)) return KeyPad[3][0];
+					if(!(GPIOA -> DATA & 0x20)) return KeyPad[3][1];
+					if(!(GPIOA -> DATA & 0x40)) return KeyPad[3][2];
+					if(!(GPIOA -> DATA & 0x80)) return KeyPad[3][3];
+					break;
+			}
+						
+			row++;
+		}
+
+    return 0x0;
+}		
+
+char ReadKeyPad()
+{
+    int row;
+		GPIOB -> DATA |= 0x03;
+		GPIOE -> DATA |= 0x30;
+		for(row = 0; row < 4; row++){
+			switch(row){
+				case 0:
+					GPIOB -> DATA &= ~0x01;
+					break;
+				case 1:
+					GPIOB -> DATA |= 0x01;
+					GPIOB -> DATA &= ~0x02;
+					break;
+				case 2:
+					GPIOB -> DATA |= 0x02;				
+					GPIOE -> DATA &= ~0x10;
+					break;
+				case 3:
+					GPIOE -> DATA |= 0x10;
+					GPIOE -> DATA &= ~0x20;
+					break;
+			}
+			
+			timer_waitMillis(10);
+			
+			if(!(GPIOB -> DATA & 0x10)) return KeyPad[row][0];
+			if(!(GPIOA -> DATA & 0x20)) return KeyPad[row][1];
+			if(!(GPIOA -> DATA & 0x40)) return KeyPad[row][2];
+			if(!(GPIOA -> DATA & 0x80)) return KeyPad[row][3];
+			
+			row++;
+		}
+
+    return 0x0;
+}
